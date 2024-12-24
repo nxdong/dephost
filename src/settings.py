@@ -32,6 +32,8 @@ class PyPISettings(BaseModel):
     ]
     timeout_seconds: int = 30
     max_retries: int = 3
+    index_update_interval: int = 3600  # 索引更新间隔（秒）
+    index_cache_ttl: int = 3600  # 索引缓存过期时间（秒）
 
 
 class UbuntuSettings(BaseModel):

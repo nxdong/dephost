@@ -1,9 +1,10 @@
+import asyncio
 import json
 import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import quote
 
 from fastapi import HTTPException, UploadFile
@@ -45,7 +46,7 @@ def normalize_package_path(package_name: str) -> str:
 def normalize_filename(filename: str) -> str:
     """
     标准化文件名:
-    1. 将包名部分的下划线替换为连字符
+    1. 将包名部的下划线替换为连字符
     2. URL编码特殊字符
     """
     # 分离文件名和扩展名
@@ -71,9 +72,13 @@ class PyPIService:
         self.download_client = DownloadClient(ProxyManager())
         self.sources = settings.pypi.sources
         self.index_file = Path(storage_path) / "package_index.json"
-        self.index_cache: Dict[str, dict] = {}
+
+        # 合并 PyPICache 的属性
+        self._local_index: Set[str] = set()
+        self._remote_index: Set[str] = set()
+        self.cache_ttl = timedelta(hours=1)
         self.last_index_update: Optional[datetime] = None
-        self.index_ttl = timedelta(hours=1)
+
         os.makedirs(storage_path, exist_ok=True)
 
     async def init_index(self):
@@ -82,21 +87,27 @@ class PyPIService:
             try:
                 with open(self.index_file, "r") as f:
                     data = json.load(f)
-                    self.index_cache = data["packages"]
+                    # 更新本地和远程索引
+                    self._local_index = set(data.get("local_packages", []))
+                    self._remote_index = set(data.get("remote_packages", []))
                     self.last_index_update = datetime.fromisoformat(data["last_update"])
-                    logger.info("package.index.loaded", count=len(self.index_cache))
+                    logger.info(
+                        "package.index.loaded",
+                        local_count=len(self._local_index),
+                        remote_count=len(self._remote_index),
+                    )
             except Exception as e:
                 logger.error("package.index.load.failed", error=str(e))
 
         # 如果没有索引或索引过期,从上游更新
-        if not self.index_cache or self._is_index_expired():
+        if not self._remote_index or self._is_index_expired():
             await self.update_index()
 
     def _is_index_expired(self) -> bool:
         """检查索引是否过期"""
         return (
             not self.last_index_update
-            or datetime.now() - self.last_index_update > self.index_ttl
+            or datetime.now() - self.last_index_update > self.cache_ttl
         )
 
     async def update_index(self):
@@ -104,23 +115,48 @@ class PyPIService:
         try:
             packages = await self.list_upstream_packages()
             if packages:
-                self.index_cache = {
-                    pkg: {"name": pkg, "last_update": datetime.now().isoformat()}
-                    for pkg in packages
-                }
+                self._remote_index = set(packages)
                 self.last_index_update = datetime.now()
 
                 # 保存到本地文件
                 cache_data = {
                     "last_update": self.last_index_update.isoformat(),
-                    "packages": self.index_cache,
+                    "local_packages": list(self._local_index),
+                    "remote_packages": list(self._remote_index),
                 }
                 with open(self.index_file, "w") as f:
                     json.dump(cache_data, f)
 
-                logger.info("package.index.updated", count=len(packages))
+                logger.info(
+                    "package.index.updated",
+                    local_count=len(self._local_index),
+                    remote_count=len(self._remote_index),
+                )
         except Exception as e:
             logger.error("package.index.update.failed", error=str(e))
+
+    def update_local_index(self, package_name: str):
+        """更新本地索引"""
+        self._local_index.add(package_name)
+        self._save_index()
+
+    def remove_from_local_index(self, package_name: str):
+        """从本地索引中移除包"""
+        self._local_index.discard(package_name)
+        self._save_index()
+
+    def _save_index(self):
+        """保存索引到文件"""
+        try:
+            cache_data = {
+                "last_update": self.last_index_update.isoformat(),
+                "local_packages": list(self._local_index),
+                "remote_packages": list(self._remote_index),
+            }
+            with open(self.index_file, "w") as f:
+                json.dump(cache_data, f)
+        except Exception as e:
+            logger.error("package.index.save.failed", error=str(e))
 
     async def get_package(
         self, package_name: str, version: str, filename: str
@@ -176,7 +212,7 @@ class PyPIService:
                     if not file_url:
                         continue
                 else:
-                    # 标准PyPI API 的文件URL格式，使用标准化的文件名
+                    # 标准PyPI API 的文件URL格式，使用标准化的件名
                     file_url = f"{source_url}/packages/{normalized_path}/{version}/{normalized_filename}"
 
                 logger.info(
@@ -259,6 +295,9 @@ class PyPIService:
         with open(file_path, "wb") as f:
             f.write(content)
 
+        # 更新本地索引
+        self.update_local_index(package_data.name)
+
         # 返回更新后的包信息
         return await self.get_package_info(package_data.name)
 
@@ -267,12 +306,18 @@ class PyPIService:
         file_path = os.path.join(self.storage_path, package_name, version)
         if not os.path.exists(file_path):
             return False
+
         os.remove(file_path)
+
+        # 如果这是包的最后一个版本,从本地索引中移除
+        if not os.listdir(os.path.dirname(file_path)):
+            self.remove_from_local_index(package_name)
+
         return True
 
     async def list_versions(self, package_name: str) -> List[PackageVersion]:
         """获取包的所有版本"""
-        # 首先尝试从本地获取
+        # 首先尝试���本地获取
         package_dir = os.path.join(self.storage_path, package_name)
         if os.path.exists(package_dir):
             versions = []
@@ -396,7 +441,7 @@ class PyPIService:
     async def list_packages(self) -> List[str]:
         """列出所有可用的包名"""
         # 确保索引已初始化
-        if not self.index_cache:
+        if not self._remote_index:
             await self.init_index()
 
         # 如果索引过期,异步更新
@@ -404,7 +449,8 @@ class PyPIService:
             logger.info("package.index.updating")
             await self.update_index()
 
-        return sorted(self.index_cache.keys())
+        # 返回合并后的索引
+        return sorted(self._local_index | self._remote_index)
 
     def get_python_requires(self, package_name: str, version: str) -> Optional[str]:
         """获取包的 Python 版本要求"""
@@ -502,36 +548,70 @@ class PyPIService:
 
     async def list_upstream_packages(self) -> List[str]:
         """从上游源获取包索引列表"""
+        max_retries = 3
+        retry_delay = 1  # 秒
+
         for source_url in self.sources:
-            try:
-                source_url = source_url.rstrip("/")
-                if "/simple" not in source_url:
-                    index_url = f"{source_url}/simple/"
-                else:
-                    index_url = source_url
+            retries = 0
+            while retries < max_retries:
+                try:
+                    source_url = source_url.rstrip("/")
+                    if "/simple" not in source_url:
+                        index_url = f"{source_url}/simple/"
+                    else:
+                        index_url = source_url
 
-                logger.info("packages.upstream.list.start", source=source_url)
+                    logger.info("packages.upstream.list.start", source=source_url)
 
-                content = await self.download_client.download(index_url)
-                if content:
-                    from bs4 import BeautifulSoup
+                    content = await self.download_client.download(index_url)
+                    if content:
+                        from bs4 import BeautifulSoup
 
-                    soup = BeautifulSoup(content, "html.parser")
-                    packages = [
-                        link.string for link in soup.find_all("a") if link.string
-                    ]
+                        soup = BeautifulSoup(content, "html.parser")
+                        packages = [
+                            link.string for link in soup.find_all("a") if link.string
+                        ]
 
-                    logger.info(
-                        "packages.upstream.list.success",
-                        source=source_url,
-                        count=len(packages),
-                    )
-                    return sorted(packages)
-
-            except Exception as e:
-                logger.error(
-                    "packages.upstream.list.failed", source=source_url, error=str(e)
-                )
-                continue
+                        logger.info(
+                            "packages.upstream.list.success",
+                            source=source_url,
+                            count=len(packages),
+                        )
+                        return sorted(packages)
+                except Exception as e:
+                    retries += 1
+                    if retries < max_retries:
+                        logger.warning(
+                            "packages.upstream.list.retry",
+                            source=source_url,
+                            attempt=retries,
+                            error=str(e),
+                        )
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(
+                            "packages.upstream.list.failed",
+                            source=source_url,
+                            error=str(e),
+                        )
 
         return []
+
+    def get_index_status(self) -> Dict[str, Any]:
+        """获取索引状态信息"""
+        return {
+            "last_update": self.last_index_update.isoformat()
+            if self.last_index_update
+            else None,
+            "local_packages_count": len(self._local_index),
+            "remote_packages_count": len(self._remote_index),
+            "is_expired": self._is_index_expired(),
+        }
+
+    def clear_index(self):
+        """清除索引缓存"""
+        self._local_index.clear()
+        self._remote_index.clear()
+        self.last_index_update = None
+        if self.index_file.exists():
+            self.index_file.unlink()
