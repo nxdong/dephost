@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title">Welcome to DepHost</h2>
+                <p class="card-text">
+                    A private Python package repository for your organization.
+                    Host your own packages and cache public packages for faster installation.
+                </p>
+            </div>
+        </div>
+
+        <h3><i class="fas fa-star me-2"></i>Popular Packages</h3>
+        <div class="row">
+            {% for package in popular_packages %}
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="/package/{{ package.name }}" class="text-decoration-none">
+                                {{ package.name }}
+                            </a>
+                        </h5>
+                        <p class="card-text text-muted">{{ package.description }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="fas fa-download me-1"></i>{{ package.downloads }}
+                            </small>
+                            <span class="badge bg-primary">v{{ package.latest_version }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-terminal me-2"></i>Quick Start
+            </div>
+            <div class="card-body">
+                <h5>Configure pip</h5>
+                <pre><code>pip config set global.index-url {{ request.base_url }}simple/</code></pre>
+
+                <h5 class="mt-3">Install a package</h5>
+                <pre><code>pip install your-package</code></pre>
+
+                <h5 class="mt-3">Upload a package</h5>
+                <pre><code>python -m twine upload --repository-url {{ request.base_url }} dist/*</code></pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-line me-2"></i>Statistics
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-box me-2"></i>Total Packages: {{ stats.total_packages }}</li>
+                    <li><i class="fas fa-download me-2"></i>Total Downloads: {{ stats.total_downloads }}</li>
+                    <li><i class="fas fa-clock me-2"></i>Cache Hit Rate: {{ stats.cache_hit_rate }}%</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

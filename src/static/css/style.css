@@ -1,0 +1,69 @@
+.navbar {
+    margin-bottom: 2rem;
+}
+
+.package-list {
+    margin-top: 2rem;
+}
+
+.version-badge {
+    font-size: 0.8em;
+    padding: 0.3em 0.6em;
+    border-radius: 3px;
+    background-color: #e9ecef;
+}
+
+pre {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+/* 通用样式 */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.footer {
+    margin-top: auto;
+}
+
+/* 包卡片样式 */
+.package-card {
+    transition: transform 0.2s;
+}
+
+.package-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 代码块样式 */
+pre {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+/* 搜索框样式 */
+.search-form input {
+    border-radius: 20px;
+    padding-left: 1rem;
+}
+
+.search-form button {
+    border-radius: 20px;
+}
+
+/* 统计卡片样式 */
+.stats-card li {
+    margin-bottom: 0.5rem;
+}
+
+/* 消息提示样式 */
+.alert {
+    margin-bottom: 1rem;
+}
