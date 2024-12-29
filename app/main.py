@@ -4,8 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.package.pypi.routes import router as api_router, lifespan  # API路由，如果有的话
-from app.package.pypi.web_routes import router as web_router
+from app.pypi.routes import lifespan
+from app.pypi.routes import router as api_router  # API路由，如果有的话
+from app.pypi.web_routes import router as web_router
 from app.settings import settings
 
 app = FastAPI(title=settings.name, lifespan=lifespan)
@@ -21,7 +22,9 @@ app.add_middleware(
 
 # 挂载静态文件
 app.mount(
-    "/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static"
+    "/static",
+    StaticFiles(directory=Path(__file__).parent / "home" / "static"),
+    name="static",
 )
 
 # 注册路由
