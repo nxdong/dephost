@@ -9,10 +9,10 @@ from urllib.parse import quote
 
 from fastapi import HTTPException, UploadFile
 
-from src.common.logger import logger
-from src.download.client import DownloadClient
-from src.proxy.manager import ProxyManager
-from src.settings import settings
+from app.common.logger import logger
+from app.download.client import DownloadClient
+from app.proxy.manager import ProxyManager
+from app.settings import settings
 
 from .schema import (
     PackageCreate,

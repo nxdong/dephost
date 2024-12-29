@@ -2,7 +2,7 @@ from typing import Dict
 from typing import Optional
 from urllib.parse import urlparse
 
-from src.common.models import ProxyConfig
+from app.common.models import ProxyConfig
 
 
 class ProxyManager:

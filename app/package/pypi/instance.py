@@ -1,4 +1,4 @@
-from src.settings import settings
+from app.settings import settings
 
 from .service import PyPIService
 

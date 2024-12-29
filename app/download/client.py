@@ -2,8 +2,8 @@ from typing import Optional
 
 import aiohttp
 
-from src.common.logger import logger
-from src.proxy.manager import ProxyManager
+from app.common.logger import logger
+from app.proxy.manager import ProxyManager
 
 
 class DownloadClient:

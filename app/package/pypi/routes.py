@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import APIRouter, FastAPI, HTTPException, status
 from fastapi.responses import HTMLResponse, Response
 
-from src.common.logger import logger
+from app.common.logger import logger
 
 from . import schema
 from .cache import PyPICache

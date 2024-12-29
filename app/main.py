@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from src.package.pypi.routes import router as api_router, lifespan  # API路由，如果有的话
-from src.package.pypi.web_routes import router as web_router
-from src.settings import settings
+from app.package.pypi.routes import router as api_router, lifespan  # API路由，如果有的话
+from app.package.pypi.web_routes import router as web_router
+from app.settings import settings
 
 app = FastAPI(title=settings.name, lifespan=lifespan)
 
