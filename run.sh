@@ -58,9 +58,9 @@ start_service() {
     echo "Port: $port"
     
     if [ "$env" = "production" ]; then
-        poetry run uvicorn src.main:app --host $host --port $port
+        poetry run uvicorn app.main:app --host $host --port $port
     else
-        poetry run uvicorn src.main:app --host $host --port $port --reload
+        poetry run uvicorn app.main:app --host $host --port $port --reload
     fi
 }
 

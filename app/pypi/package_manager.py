@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
-from app.common.download.client import DownloadClient
+from app.common.download_client import DownloadClient
 from app.common.logger import logger
-from app.common.proxy.manager import ProxyManager
+from app.common.proxy_manager import ProxyManager
 from app.settings import settings
 
 
@@ -17,6 +17,7 @@ class PackageManager:
         self.settings = settings.pypi
         self.storage_path = Path(self.settings.packages_path)
         self.download_client = DownloadClient(ProxyManager())
+        self.sources = self.settings.sources
 
         # 确保存储目录存在
         self.storage_path.mkdir(parents=True, exist_ok=True)
@@ -145,3 +146,95 @@ class PackageManager:
                                 path=str(file_path),
                                 error=str(e),
                             )
+
+    async def get_package(
+        self, package_name: str, version: str, filename: str
+    ) -> bytes:
+        """获取包文件内容"""
+        normalized_name = self.normalize_package_name(package_name)
+        normalized_filename = self.normalize_filename(filename)
+        package_path = (
+            self.storage_path / normalized_name / version / normalized_filename
+        )
+
+        # 检查本地缓存
+        if package_path.exists():
+            return package_path.read_bytes()
+
+        # 从远程源下载
+        content = await self._download_from_sources(package_name, version, filename)
+        if content:
+            # 保存到本地缓存
+            package_path.parent.mkdir(parents=True, exist_ok=True)
+            package_path.write_bytes(content)
+            return content
+
+        raise HTTPException(
+            status_code=404,
+            detail=f"Package {package_name} version {version} not found",
+        )
+
+    async def _download_from_sources(
+        self, package_name: str, version: str, filename: str
+    ) -> Optional[bytes]:
+        """从源站下载包文件"""
+        normalized_path = normalize_package_path(package_name)
+
+        for source_url in self.sources:
+            try:
+                source_url = source_url.rstrip("/")
+                if "/simple" in source_url:
+                    # 处理 simple API
+                    index_url = f"{source_url}/{normalized_path}/"
+                    index_content = await self.download_client.download(index_url)
+                    if not index_content:
+                        continue
+
+                    soup = BeautifulSoup(index_content, "html.parser")
+                    file_url = None
+                    for link in soup.find_all("a"):
+                        link_text = link.string if link.string else ""
+                        normalized_link = link_text.replace("_", "-")
+                        if (
+                            normalized_link
+                            and normalize_filename(filename) in normalized_link
+                        ):
+                            file_url = link.get("href")
+                            break
+
+                    if not file_url:
+                        continue
+                else:
+                    # 标准 PyPI API
+                    file_url = (
+                        f"{source_url}/packages/{normalized_path}/{version}/{filename}"
+                    )
+
+                logger.info(
+                    "package.download.start",
+                    package=package_name,
+                    version=version,
+                    source=source_url,
+                )
+
+                content = await self.download_client.download(file_url)
+                if content:
+                    logger.info(
+                        "package.download.success",
+                        package=package_name,
+                        version=version,
+                        source=source_url,
+                    )
+                    return content
+
+            except Exception as e:
+                logger.error(
+                    "package.download.failed",
+                    package=package_name,
+                    version=version,
+                    source=source_url,
+                    error=str(e),
+                )
+                continue
+
+        return None

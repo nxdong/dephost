@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings
 class ProxySettings(BaseModel):
     """代理服务器配置"""
 
+    enabled: bool = Field(default=False)
     http_proxy: str | None = None
     https_proxy: str | None = None
     socks5_proxy: str | None = None
@@ -69,7 +70,7 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # 工作路径
-    work_dir: str = "./work"
+    work_dir: str = "./dephost_work"
 
     # 各模块配置
     pypi: PyPISettings = PyPISettings(work_dir=work_dir)

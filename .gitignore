@@ -40,6 +40,4 @@ logs/
 coverage.xml
 .pytest_cache/ 
 
-# 缓存
-cache/
-storage/
+dephost_work/
