@@ -62,7 +62,7 @@ sources:
 
 ```bash
 #启动服务
-poetry run python -m src.main
+poetry run python -m app.main
 # 服务默认在 http://localhost:8000 启动
 ```
 
@@ -103,5 +103,5 @@ poetry run ruff format .
 # 检查代码并自动修复简单问题
 poetry run ruff check . --fix
 # 运行类型检查
-poetry run mypy src
+poetry run mypy app
 ```

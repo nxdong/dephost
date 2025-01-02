@@ -44,12 +44,6 @@ class PyPIService:
         ):
             await self.index_manager.update_index()
 
-    async def get_package(
-        self, package_name: str, version: str, filename: str
-    ) -> bytes:
-        """获取包文件内容"""
-        return await self.package_manager.get_package(package_name, version, filename)
-
     def get_index_status(self) -> Dict[str, Any]:
         """获取索引状态"""
         return self.index_manager.get_index_status()

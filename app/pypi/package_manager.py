@@ -3,10 +3,37 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
+from bs4 import BeautifulSoup
+from fastapi import HTTPException
+
 from app.common.download_client import DownloadClient
 from app.common.logger import logger
 from app.common.proxy_manager import ProxyManager
 from app.settings import settings
+
+
+def normalize_package_name(package_name: str) -> str:
+    """标准化包名"""
+    return package_name.lower().replace("_", "-").replace(" ", "-")
+
+
+def normalize_package_path(package_name: str) -> str:
+    """标准化包路径"""
+    normalized = normalize_package_name(package_name)
+    return quote(normalized)
+
+
+def normalize_filename(filename: str) -> str:
+    """标准化文件名"""
+    name_parts = filename.rsplit(".", 2)
+    if len(name_parts) > 1:
+        base_name = name_parts[0]
+        extensions = ".".join(name_parts[1:])
+        normalized_base = base_name.replace("_", "-")
+        normalized = f"{normalized_base}.{extensions}"
+    else:
+        normalized = filename.replace("_", "-")
+    return quote(normalized)
 
 
 class PackageManager:
@@ -194,27 +221,37 @@ class PackageManager:
                     file_url = None
                     for link in soup.find_all("a"):
                         link_text = link.string if link.string else ""
-                        normalized_link = link_text.replace("_", "-")
-                        if (
-                            normalized_link
-                            and normalize_filename(filename) in normalized_link
-                        ):
+                        if link_text and filename == link_text:
                             file_url = link.get("href")
+                            logger.info(
+                                "package.download.match_found",
+                                link_text=link_text,
+                                filename=filename,
+                            )
                             break
 
                     if not file_url:
+                        logger.info("package.download.no_match", filename=filename)
                         continue
+
+                    # 处理相对URL
+                    if file_url.startswith("../") or file_url.startswith("./"):
+                        # 获取基础URL（移除 /simple/package_name/）
+                        base_url = source_url.rsplit("/simple/", 1)[0]
+                        # 移除URL中的hash部分
+                        file_url = file_url.split("#")[0]
+                        # 构建完整URL
+                        file_url = f"{base_url}/packages/{file_url.lstrip('./')}"
                 else:
-                    # 标准 PyPI API
-                    file_url = (
-                        f"{source_url}/packages/{normalized_path}/{version}/{filename}"
-                    )
+                    # 修改这里的URL构造逻辑
+                    file_url = f"{source_url}/packages/source/{normalized_path[0]}/{normalized_path}/{filename}"
 
                 logger.info(
-                    "package.download.start",
+                    "package.download.attempt",
                     package=package_name,
                     version=version,
                     source=source_url,
+                    file_url=file_url,
                 )
 
                 content = await self.download_client.download(file_url)

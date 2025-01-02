@@ -187,8 +187,13 @@ class PyPIIndexManager:
         # 遍历所有源
         for source_url in self.sources:
             try:
-                # 构建包版本列表URL
-                index_url = f"{source_url}/simple/{package_name}/"
+                # 修改这里的URL构造逻辑
+                source_url = source_url.rstrip("/")
+                index_url = (
+                    f"{source_url}/simple/{package_name}/"
+                    if "/simple" not in source_url
+                    else f"{source_url}/{package_name}/"
+                )
                 content = await self.download_client.download(index_url)
 
                 if content:

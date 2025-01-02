@@ -18,7 +18,6 @@ check_poetry() {
 # 检查并创建必要的目录
 setup_directories() {
     echo -e "${YELLOW}Setting up directories...${NC}"
-    mkdir -p cache/pypi cache/ubuntu logs
 }
 
 # 安装依赖

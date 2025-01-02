@@ -68,7 +68,9 @@ async def get_package_versions(package_name: str):
 @api_router.get("/packages/{package_name}/{version}/{filename}")
 async def get_package_file(package_name: str, version: str, filename: str):
     """获取包文件"""
-    content = await pypi_service.get_package(package_name, version, filename)
+    content = await pypi_service.package_manager.get_package(
+        package_name, version, filename
+    )
     if not content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
